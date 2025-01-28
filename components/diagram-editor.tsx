@@ -25,6 +25,8 @@ import { PropertiesPanel } from './properties-panel'
 import CustomNode from './custom-node'
 import type { DiagramNode, DiagramEdge } from '../types/diagram'
 import CustomBezierEdge from './custom-bezeir-edge';
+import CustomSmoothStepEdge from './customSmoothStepEdge'
+import CustomStepEdge from './customStepEdge'
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -33,8 +35,8 @@ const nodeTypes = {
 const edgeTypes: EdgeTypes = {
   default: CustomBezierEdge,
   straight: StraightEdge,
-  step: StepEdge,
-  smoothstep: SmoothStepEdge,
+  step: CustomStepEdge,
+  smoothstep: CustomSmoothStepEdge,
 }
 
 export default function DiagramEditor() {
@@ -54,7 +56,7 @@ export default function DiagramEditor() {
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds):any => addEdge({ 
-      ...params, 
+        ...params,
       type: 'default',
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds)),

@@ -14,14 +14,16 @@ export interface DiagramEdge {
   source: string
   target: string
   label?: string
-  type: 'default' | 'straight' | 'bezier' | 'step' | 'smoothstep'
+  type: 'default' | 'straight' | 'step' | 'smoothstep'
   animated?: boolean
   style?: React.CSSProperties
   markerEnd?: string
+  data?: {
+    marker?: { x: number; y: number } | null
+  }
 }
 
 export interface DiagramData {
   nodes: DiagramNode[]
   edges: DiagramEdge[]
 }
-
