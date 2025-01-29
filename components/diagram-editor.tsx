@@ -29,8 +29,11 @@ import CustomSmoothStepEdge from './customSmoothStepEdge'
 import CustomStepEdge from './customStepEdge'
 
 const nodeTypes = {
-  customNode: CustomNode,
-}
+  rectangle: CustomNode,
+  ellipse: CustomNode,
+  diamond: CustomNode,
+  parallelogram: CustomNode,
+};
 
 const edgeTypes: EdgeTypes = {
   default: CustomBezierEdge,

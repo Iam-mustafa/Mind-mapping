@@ -1,135 +1,128 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { EdgeProps, useReactFlow } from 'reactflow';
+import { EdgeProps, getMarkerEnd, MarkerType, useReactFlow } from 'reactflow';
 
-const DraggableStepEdge: React.FC<EdgeProps> = ({
+const CustomStepEdge = ({
   id,
   sourceX,
   sourceY,
   targetX,
   targetY,
-  sourcePosition,
-  targetPosition,
   style = {},
   markerEnd,
-  data,
-}) => {
-  const { setEdges } = useReactFlow();
-  const [isDragging, setIsDragging] = useState(false);
-  const [showControlPoint, setShowControlPoint] = useState(false);
+}: EdgeProps) => {
+  const { project, setEdges } = useReactFlow();
+  const [marker, setMarker] = useState<{ x: number; y: number } | null>(null); // Marker state
+  const [dragging, setDragging] = useState(false);
 
-  // Get initial control point or calculate default
-  const initialControl = data?.controlPoint || {
-    x: (sourceX + targetX) / 2,
-    y: (sourceY + targetY) / 2,
-  };
-  const [controlPoint, setControlPoint] = useState(initialControl);
+  const onPathClick = useCallback(
+    (event: React.MouseEvent) => {
+      const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+      if (reactFlowBounds) {
+        const x = event.clientX - reactFlowBounds.left;
+        const y = event.clientY - reactFlowBounds.top;
+        const projectedPoint = project({ x, y });
 
-  // Calculate custom smooth step path
-  const edgePath = React.useMemo(() => {
-    const horizontal = Math.abs(targetX - sourceX) > Math.abs(targetY - sourceY);
-    const bendPosition = data?.bendPosition || controlPoint;
-
-    if (horizontal) {
-      return `M ${sourceX},${sourceY} L ${bendPosition.x},${sourceY} L ${bendPosition.x},${targetY} L ${targetX},${targetY}`;
-    }
-    return `M ${sourceX},${sourceY} L ${sourceX},${bendPosition.y} L ${targetX},${bendPosition.y} L ${targetX},${targetY}`;
-  }, [sourceX, sourceY, targetX, targetY, controlPoint, data?.bendPosition]);
-
-  // Handle mouse down on control point
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  // Handle double-click on control point to delete it
-  const handleControlPointDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowControlPoint(false); // Hide the control point
-  }, []);
-
-  // Handle path click to toggle control point visibility
-  const handlePathClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowControlPoint((prev) => !prev); // Toggle visibility
-  }, []);
-
-  // Update edge data when control point changes
-  useEffect(() => {
-    setEdges((edges) =>
-      edges.map((edge) =>
-        edge.id === id ? { ...edge, data: { ...edge.data, controlPoint } } : edge
-      )
-    );
-  }, [controlPoint, id, setEdges]);
-
-  // Mouse move handler
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!isDragging) return;
-
-      const svg = document.querySelector('svg.react-flow__edges') as SVGSVGElement;
-      if (!svg) return;
-
-      const point = svg.createSVGPoint();
-      point.x = e.clientX;
-      point.y = e.clientY;
-
-      const svgPoint = point.matrixTransform(svg.getScreenCTM()?.inverse() || new DOMMatrix());
-
-      setControlPoint({
-        x: svgPoint.x,
-        y: svgPoint.y,
-      });
+        // Set the marker at the clicked position
+        setMarker({ x: projectedPoint.x, y: projectedPoint.y });
+      }
     },
-    [isDragging]
+    [project]
   );
 
-  // Mouse up handler
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const onMouseDown = useCallback(() => {
+    if (marker) {
+      setDragging(true); // Start dragging the marker
+    }
+  }, [marker]);
 
-  // Event listener management
+  const onMouseMove = useCallback(
+    (event: MouseEvent) => {
+      if (dragging && marker) {
+        const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+        if (reactFlowBounds) {
+          const x = event.clientX - reactFlowBounds.left;
+          const y = event.clientY - reactFlowBounds.top;
+          const projectedPoint = project({ x, y });
+
+          // Update marker position while dragging
+          setMarker(projectedPoint);
+        }
+      }
+    },
+    [dragging, project, marker]
+  );
+
+  const onMouseUp = useCallback(() => {
+    if (dragging) {
+      setDragging(false); // Stop dragging
+      setEdges((edges) =>
+        edges.map((edge) =>
+          edge.id === id ? { ...edge, data: { ...edge.data, marker } } : edge
+        )
+      );
+    }
+  }, [dragging, id, marker, setEdges]);
+
+  const onMarkerDoubleClick = useCallback(() => {
+    setMarker(null); // Remove the marker on double-click
+    setEdges((edges) =>
+      edges.map((edge) =>
+        edge.id === id ? { ...edge, data: { ...edge.data, marker: null } } : edge
+      )
+    );
+  }, [id, setEdges]);
+
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+    if (dragging) {
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+    } else {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     }
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [dragging, onMouseMove, onMouseUp]);
+
+  // Default control points (if no marker is set)
+  const defaultControlPointX = (sourceX + targetX) / 2;
+  const defaultControlPointY = (sourceY + targetY) / 2;
+  
+  // Smooth step logic for right-angle corner
+  const controlPointX = marker ? marker.x : defaultControlPointX;
+  const controlPointY = marker ? marker.y : defaultControlPointY;
+
+  // Smoothstep path (right-angle)
+  const smoothStepPath = `M${sourceX},${sourceY} H${controlPointX} V${controlPointY} H${targetX} V${targetY}`;
 
   return (
     <>
-      {/* Path for the edge */}
+      {/* Render the main path */}
       <path
         id={id}
-        style={{ ...style, cursor: 'move' }}
+        style={style}
         className="react-flow__edge-path"
-        d={edgePath}
-        markerEnd={markerEnd}
-        onClick={handlePathClick} // Handle path click to toggle control point
+        d={smoothStepPath}
+        markerEnd={getMarkerEnd(markerEnd as MarkerType)}
+        onClick={onPathClick} // Allow adding a marker on click
       />
-      {/* Control Point (conditionally rendered) */}
-      {showControlPoint && (
+      {/* Render the marker if it exists */}
+      {marker && (
         <circle
-          cx={controlPoint.x}
-          cy={controlPoint.y}
-          r={3}
+          cx={marker.x}
+          cy={marker.y}
+          r={2}
           fill="blue"
-          stroke="#555"
-          strokeWidth={1}
-          onMouseDown={handleMouseDown} // Drag behavior
-          onDoubleClick={handleControlPointDoubleClick} // Delete on double-click
-          className="cursor-move edge-control-point"
-          style={{ pointerEvents: 'all' }}
+          onMouseDown={onMouseDown} // Allow dragging the marker
+          onDoubleClick={onMarkerDoubleClick} // Remove marker on double-click
+          className="cursor-move"
         />
       )}
     </>
   );
 };
 
-export default DraggableStepEdge;
+export default CustomStepEdge;
