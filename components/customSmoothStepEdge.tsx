@@ -100,19 +100,37 @@ const CustomStepEdge = ({
   const controlPointY = marker ? marker.y : defaultControlPointY;
 
   // 📌 Curve radius (smooth rounding effect)
-  const curveRadius = 15; // Adjust for smoother or sharper curves
+  const curveRadius = 5; // Adjust for smoother or sharper curves
+// 📌 Calculate key points with dynamic directions
+const dirXSourceToControl = controlPointX - sourceX > 0 ? 1 : -1;
+const dirYControlVertical = controlPointY - sourceY > 0 ? 1 : -1;
+const dirXControlToTarget = targetX - controlPointX > 0 ? 1 : -1;
+const dirYTargetVertical = targetY - controlPointY > 0 ? 1 : -1;
 
-  // 📌 Smooth step path with rounded corners using quadratic Bézier curves
-  const smoothStepPath = `
-    M${sourceX},${sourceY} 
-    L${controlPointX - curveRadius},${sourceY}
-    Q${controlPointX},${sourceY} ${controlPointX},${sourceY + curveRadius}
-    L${controlPointX},${controlPointY - curveRadius}
-    Q${controlPointX},${controlPointY} ${controlPointX + curveRadius},${controlPointY}
-    L${targetX - curveRadius},${controlPointY}
-    Q${targetX},${controlPointY} ${targetX},${controlPointY + curveRadius}
-    L${targetX},${targetY}
-  `;
+// 📌 Dynamically reduce the curve radius when close to avoid overlap
+const dynamicCurveRadius = Math.min(curveRadius, Math.abs(targetX - controlPointX) / 2, Math.abs(targetY - controlPointY) / 2);
+
+// 📌 Adjust points using the dynamic curve radius
+const horizontalEndX = controlPointX - dirXSourceToControl * curveRadius;
+const verticalStartY = sourceY + dirYControlVertical * curveRadius;
+const verticalEndY = controlPointY - dirYControlVertical * curveRadius;
+const horizontalStartX = controlPointX + dirXControlToTarget * curveRadius;
+
+// ✅ Special handling at the final connection point
+const horizontalEndTargetX = targetX - dirXControlToTarget * dynamicCurveRadius;
+const verticalTargetStartY = controlPointY + dirYTargetVertical * dynamicCurveRadius;
+
+// 📌 Updated path to smooth out the final transition
+const smoothStepPath = `
+  M${sourceX},${sourceY}
+  L${horizontalEndX},${sourceY}
+  Q${controlPointX},${sourceY} ${controlPointX},${verticalStartY}
+  L${controlPointX},${verticalEndY}
+  Q${controlPointX},${controlPointY} ${horizontalStartX},${controlPointY}
+  L${horizontalEndTargetX},${controlPointY}
+  Q${targetX},${controlPointY} ${targetX},${verticalTargetStartY}
+  L${targetX},${targetY}
+`;
 
   return (
     <>
